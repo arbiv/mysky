@@ -390,20 +390,26 @@
     background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.18));
   }
 
-  /* SUNRISE / SUNSET BAR */
+  /* SUNRISE / SUNSET PROGRESS BAR */
   .sun-bar {
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; gap:12px;
     margin: 4px 16px 14px;
-    padding: 11px 18px;
+    padding: 12px 18px;
     border-radius: 16px;
     background: var(--glass);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(10px);
   }
-  .sun-item { display:flex; align-items:center; gap:7px; font-size:0.88rem; }
-  .sun-item .sun-label { color:var(--text-dim); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; margin-right:2px; }
-  .sun-item-right .sun-label { margin-right:0; margin-left:2px; }
-  .sun-divider { width:1px; height:24px; background:var(--glass-border); }
+  .sun-endpoint { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:44px; }
+  .sun-endpoint-icon { font-size:1.1rem; line-height:1; }
+  .sun-endpoint-time { font-size:0.8rem; font-weight:600; }
+  .sun-endpoint-label { color:var(--text-dim); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; }
+  .sun-track-wrap { flex:1; position:relative; height:30px; display:flex; align-items:center; }
+  .sun-track { width:100%; height:4px; border-radius:2px; background:var(--glass-border); position:relative; }
+  .sun-track-fill { position:absolute; top:0; left:0; height:100%; border-radius:2px; }
+  .sun-track-day { background:linear-gradient(90deg,#f59e0b99,#f9731699); }
+  .sun-track-night { background:linear-gradient(90deg,#6366f199,#818cf899); }
+  .sun-marker { position:absolute; top:50%; transform:translate(-50%,-50%); font-size:1rem; line-height:1; }
 
   /* fade in */
   @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -534,6 +540,13 @@ function renderWeather(data, locationName) {
   const now = new Date();
   const currentHour = now.getHours();
 
+  // today is index 1 because past_days=1 shifts by one
+  const todayIdx = 1;
+  const sunriseDate = d.sunrise?.[todayIdx] ? new Date(d.sunrise[todayIdx]) : null;
+  const sunsetDate  = d.sunset?.[todayIdx]  ? new Date(d.sunset[todayIdx])  : null;
+  const tomorrowSunriseDate = d.sunrise?.[todayIdx + 1] ? new Date(d.sunrise[todayIdx + 1]) : null;
+  const yesterdaySunsetDate = d.sunset?.[0] ? new Date(d.sunset[0]) : null;
+
   // Build hourly (next 24h)
   let hourlyHTML = '';
   if (PREFS.showHourly) {
@@ -542,7 +555,9 @@ function renderWeather(data, locationName) {
       if (idx >= h.time.length) break;
       const t = new Date(h.time[idx]);
       const label = i === 0 ? 'Now' : t.getHours().toString().padStart(2,'0') + ':00';
-      const [icon] = wxInfo(h.weather_code[idx]);
+      let [icon] = wxInfo(h.weather_code[idx]);
+      const hCode = h.weather_code[idx];
+      if ((sunriseDate && sunsetDate) && (t < sunriseDate || t > sunsetDate) && (hCode === 0 || hCode === 1)) icon = '🌙';
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
@@ -611,15 +626,54 @@ function renderWeather(data, locationName) {
       </div>
     </div>`;
 
-  // Sunrise / sunset inline bar — today is index 1 (past_days=1 shifts by 1)
-  const todayIdx = 1;
-  const sunrise = d.sunrise?.[todayIdx] ? new Date(d.sunrise[todayIdx]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
-  const sunset  = d.sunset?.[todayIdx]  ? new Date(d.sunset[todayIdx]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+  // Daily progress bar (sunrise↔sunset during day, sunset↔sunrise during night)
+  const sunrise = sunriseDate ? sunriseDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+  const sunset  = sunsetDate  ? sunsetDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})  : '--';
+  const tomorrowSunrise = tomorrowSunriseDate ? tomorrowSunriseDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+
+  let sbStartIcon = '🌅', sbStartTime = sunrise, sbStartLabel = 'Sunrise';
+  let sbEndIcon = '🌇', sbEndTime = sunset, sbEndLabel = 'Sunset';
+  let sbMarker = '☀️', sbTrackClass = 'sun-track-day', sbPct = 0;
+
+  if (sunriseDate && sunsetDate) {
+    if (now >= sunriseDate && now <= sunsetDate) {
+      sbPct = Math.min(100, (now - sunriseDate) / (sunsetDate - sunriseDate) * 100);
+      sbStartIcon = '🌅'; sbStartTime = sunrise;        sbStartLabel = 'Sunrise';
+      sbEndIcon   = '🌇'; sbEndTime   = sunset;          sbEndLabel   = 'Sunset';
+      sbMarker = '☀️'; sbTrackClass = 'sun-track-day';
+    } else if (now > sunsetDate) {
+      const nextSr = tomorrowSunriseDate ?? new Date(sunriseDate.getTime() + 86400000);
+      sbPct = Math.min(100, (now - sunsetDate) / (nextSr - sunsetDate) * 100);
+      sbStartIcon = '🌇'; sbStartTime = sunset;          sbStartLabel = 'Sunset';
+      sbEndIcon   = '🌅'; sbEndTime   = tomorrowSunrise; sbEndLabel   = 'Sunrise';
+      sbMarker = '🌙'; sbTrackClass = 'sun-track-night';
+    } else {
+      const prevSs = yesterdaySunsetDate ?? new Date(sunsetDate.getTime() - 86400000);
+      sbPct = Math.min(100, (now - prevSs) / (sunriseDate - prevSs) * 100);
+      sbStartIcon = '🌇'; sbStartTime = prevSs.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); sbStartLabel = 'Sunset';
+      sbEndIcon   = '🌅'; sbEndTime   = sunrise;          sbEndLabel   = 'Sunrise';
+      sbMarker = '🌙'; sbTrackClass = 'sun-track-night';
+    }
+  }
+
   const sunBarHTML = `
     <div class="sun-bar fade-up">
-      <div class="sun-item"><span class="sun-label">Sunrise</span><strong>${sunrise}</strong></div>
-      <div class="sun-divider"></div>
-      <div class="sun-item sun-item-right"><strong>${sunset}</strong><span class="sun-label">Sunset</span></div>
+      <div class="sun-endpoint">
+        <div class="sun-endpoint-icon">${sbStartIcon}</div>
+        <div class="sun-endpoint-time">${sbStartTime}</div>
+        <div class="sun-endpoint-label">${sbStartLabel}</div>
+      </div>
+      <div class="sun-track-wrap">
+        <div class="sun-track">
+          <div class="sun-track-fill ${sbTrackClass}" style="width:${sbPct.toFixed(1)}%"></div>
+        </div>
+        <div class="sun-marker" style="left:${sbPct.toFixed(1)}%">${sbMarker}</div>
+      </div>
+      <div class="sun-endpoint">
+        <div class="sun-endpoint-icon">${sbEndIcon}</div>
+        <div class="sun-endpoint-time">${sbEndTime}</div>
+        <div class="sun-endpoint-label">${sbEndLabel}</div>
+      </div>
     </div>`;
 
   const [wxIcon, wxLabel] = wxInfo(c.weather_code);
