@@ -133,11 +133,18 @@
     opacity:0.7;
   }
   .location-row {
-    display:flex; align-items:center; gap:6px;
-    font-size:0.85rem; color:var(--text-dim);
+    display:flex; align-items:center; justify-content:space-between;
     margin-bottom:12px;
   }
-  .location-name { font-size:0.95rem; color:var(--text); font-weight:500; }
+  .location-pill {
+    display:inline-flex; align-items:center; gap:5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.13);
+    font-size:0.8rem; color:var(--text-dim); white-space:nowrap;
+  }
+  .location-pill .location-name { font-size:0.8rem; color:var(--text); font-weight:500; }
 
   .temp-display {
     display:flex; align-items:flex-start; gap:0;
@@ -156,10 +163,6 @@
   .temp-unit {
     font-size:1.6rem; color:var(--accent); margin-top:12px; cursor:pointer;
     font-weight:300;
-  }
-  .temp-uv-inline {
-    display:flex; flex-direction:column; justify-content:flex-end;
-    padding-bottom: 8px; margin-left: 14px; gap:4px;
   }
 .uv-pill {
     display:inline-flex; align-items:center; gap:5px;
@@ -676,13 +679,15 @@ function renderWeather(data, locationName) {
 
   document.getElementById('main').innerHTML = `
     <div class="hero-card fade-up">
-      <div class="location-row">📍 <span class="location-name">${locationName}</span></div>
+      <div class="location-row">
+        <div class="location-pill">📍 <span class="location-name">${locationName}</span></div>
+        ${uvInlineHTML}
+      </div>
       <div class="temp-display">
         <div class="temp-main">
           <div class="temp-big">${fmtNum(c.temperature_2m)}</div>
           <div class="temp-unit" id="unitSwitch">${unitLabel()}</div>
         </div>
-        ${uvInlineHTML}
       </div>
       <div class="condition-text">${wxLabel}</div>
       <div class="hero-chips">
