@@ -469,13 +469,6 @@
     </div>
   </div>
 
-  <div class="setting-row">
-    <div class="setting-label">Show Stats</div>
-    <div class="toggle-row">
-      <span style="font-size:0.9rem">Wind / Humidity / UV</span>
-      <div class="toggle on" id="statsToggle"><div class="toggle-dot"></div></div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -483,7 +476,6 @@ const PREFS = {
   theme: 'arctic',
   useFahrenheit: false,
   showHourly: true,
-  showStats: true,
   lastCity: 'Tel Aviv',
   lastLat: null,
   lastLon: null
@@ -592,10 +584,8 @@ function renderWeather(data, locationName) {
     </div>`;
   }
 
-  // Stats (sunrise/sunset moved out)
-  let statsHTML = '';
-  if (PREFS.showStats) {
-    statsHTML = `
+  // Stats
+  const statsHTML = `
     <div class="section-label fade-up">Details</div>
     <div class="stats-grid">
       <div class="stat-card fade-up">
@@ -619,7 +609,6 @@ function renderWeather(data, locationName) {
         <div class="stat-value">${Math.round(c.surface_pressure ?? 0)}<span class="stat-unit">hPa</span></div>
       </div>
     </div>`;
-  }
 
   // Sunrise / sunset inline bar — today is index 1 (past_days=1 shifts by 1)
   const todayIdx = 1;
@@ -795,15 +784,6 @@ hourlyToggle.addEventListener('click', () => {
   else loadCity(PREFS.lastCity);
 });
 
-const statsToggle = document.getElementById('statsToggle');
-statsToggle.addEventListener('click', () => {
-  PREFS.showStats = !PREFS.showStats;
-  statsToggle.classList.toggle('on', PREFS.showStats);
-  savePrefs();
-  if (PREFS.lastLat) loadCoords(PREFS.lastLat, PREFS.lastLon, PREFS.lastCity);
-  else loadCity(PREFS.lastCity);
-});
-
 // Search
 const cityInput = document.getElementById('cityInput');
 document.getElementById('searchBtn').addEventListener('click', () => {
@@ -865,7 +845,6 @@ loadPrefs();
 applyTheme(PREFS.theme);
 unitToggle.classList.toggle('on', PREFS.useFahrenheit);
 hourlyToggle.classList.toggle('on', PREFS.showHourly);
-statsToggle.classList.toggle('on', PREFS.showStats);
 if (PREFS.lastLat) loadCoords(PREFS.lastLat, PREFS.lastLon, PREFS.lastCity);
 else loadCity(PREFS.lastCity);
 </script>
