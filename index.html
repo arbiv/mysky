@@ -401,7 +401,6 @@
     backdrop-filter: blur(10px);
   }
   .sun-endpoint { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:44px; }
-  .sun-endpoint-icon { font-size:1.1rem; line-height:1; }
   .sun-endpoint-time { font-size:0.8rem; font-weight:600; }
   .sun-endpoint-label { color:var(--text-dim); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; }
   .sun-track-wrap { flex:1; position:relative; height:30px; display:flex; align-items:center; }
@@ -547,6 +546,23 @@ function renderWeather(data, locationName) {
   const tomorrowSunriseDate = d.sunrise?.[todayIdx + 1] ? new Date(d.sunrise[todayIdx + 1]) : null;
   const yesterdaySunsetDate = d.sunset?.[0] ? new Date(d.sunset[0]) : null;
 
+  // Per-date sunrise/sunset map for accurate night detection across day boundaries
+  const dailySunMap = {};
+  if (d.time) {
+    d.time.forEach((dateStr, i) => {
+      dailySunMap[dateStr] = {
+        sr: d.sunrise?.[i] ? new Date(d.sunrise[i]) : null,
+        ss: d.sunset?.[i]  ? new Date(d.sunset[i])  : null,
+      };
+    });
+  }
+  function isHourNight(hTimeStr) {
+    const entry = dailySunMap[hTimeStr.slice(0, 10)];
+    if (!entry || !entry.sr || !entry.ss) return false;
+    const t = new Date(hTimeStr);
+    return t < entry.sr || t > entry.ss;
+  }
+
   // Build hourly (next 24h)
   let hourlyHTML = '';
   if (PREFS.showHourly) {
@@ -557,7 +573,7 @@ function renderWeather(data, locationName) {
       const label = i === 0 ? 'Now' : t.getHours().toString().padStart(2,'0') + ':00';
       let [icon] = wxInfo(h.weather_code[idx]);
       const hCode = h.weather_code[idx];
-      if ((sunriseDate && sunsetDate) && (t < sunriseDate || t > sunsetDate) && (hCode === 0 || hCode === 1)) icon = '🌙';
+      if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1)) icon = '🌙';
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
@@ -659,7 +675,6 @@ function renderWeather(data, locationName) {
   const sunBarHTML = `
     <div class="sun-bar fade-up">
       <div class="sun-endpoint">
-        <div class="sun-endpoint-icon">${sbStartIcon}</div>
         <div class="sun-endpoint-time">${sbStartTime}</div>
         <div class="sun-endpoint-label">${sbStartLabel}</div>
       </div>
@@ -670,7 +685,6 @@ function renderWeather(data, locationName) {
         <div class="sun-marker" style="left:${sbPct.toFixed(1)}%">${sbMarker}</div>
       </div>
       <div class="sun-endpoint">
-        <div class="sun-endpoint-icon">${sbEndIcon}</div>
         <div class="sun-endpoint-time">${sbEndTime}</div>
         <div class="sun-endpoint-label">${sbEndLabel}</div>
       </div>
