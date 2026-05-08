@@ -654,8 +654,8 @@ function renderWeather(data, locationName) {
   const uvInlineHTML = `
     <div class="temp-uv-inline">
       <div class="uv-pill ${curUVClass}">
-        <span class="uv-pill-dot"></span>
-        UV ${currentUV} ${uvLabel(currentUV)}
+        UV <span class="uv-pill-dot"></span>
+        ${currentUV} ${uvLabel(currentUV)}
       </div>
     </div>`;
 
