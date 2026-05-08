@@ -161,11 +161,7 @@
     display:flex; flex-direction:column; justify-content:flex-end;
     padding-bottom: 8px; margin-left: 14px; gap:4px;
   }
-  .uv-inline-label {
-    font-size:0.62rem; text-transform:uppercase; letter-spacing:0.12em;
-    color:var(--text-dim); line-height:1;
-  }
-  .uv-pill {
+.uv-pill {
     display:inline-flex; align-items:center; gap:5px;
     padding: 4px 10px 4px 7px;
     border-radius: 20px;
@@ -657,10 +653,9 @@ function renderWeather(data, locationName) {
   // Current UV shown inline next to temp (always show)
   const uvInlineHTML = `
     <div class="temp-uv-inline">
-      <span class="uv-inline-label">UV now</span>
       <div class="uv-pill ${curUVClass}">
         <span class="uv-pill-dot"></span>
-        ${currentUV} ${uvLabel(currentUV)}
+        UV ${currentUV} ${uvLabel(currentUV)}
       </div>
     </div>`;
 
