@@ -401,8 +401,8 @@
     backdrop-filter: blur(10px);
   }
   .sun-item { display:flex; align-items:center; gap:7px; font-size:0.88rem; }
-  .sun-item .sun-icon { font-size:1.1rem; }
   .sun-item .sun-label { color:var(--text-dim); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; margin-right:2px; }
+  .sun-item-right .sun-label { margin-right:0; margin-left:2px; }
   .sun-divider { width:1px; height:24px; background:var(--glass-border); }
 
   /* fade in */
@@ -628,9 +628,9 @@ function renderWeather(data, locationName) {
   const sunset  = d.sunset?.[todayIdx]  ? new Date(d.sunset[todayIdx]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
   const sunBarHTML = `
     <div class="sun-bar fade-up">
-      <div class="sun-item"><span class="sun-icon">🌅</span><span class="sun-label">Sunrise</span><strong>${sunrise}</strong></div>
+      <div class="sun-item"><span class="sun-label">Sunrise</span><strong>${sunrise}</strong></div>
       <div class="sun-divider"></div>
-      <div class="sun-item"><span class="sun-icon">🌇</span><span class="sun-label">Sunset</span><strong>${sunset}</strong></div>
+      <div class="sun-item sun-item-right"><strong>${sunset}</strong><span class="sun-label">Sunset</span></div>
     </div>`;
 
   const [wxIcon, wxLabel] = wxInfo(c.weather_code);
@@ -814,6 +814,14 @@ cityInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') { const v = cityInput.value.trim(); if(v) loadCity(v); }
 });
 
+async function reverseGeocode(lat, lon) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+    const d = await r.json();
+    return d.address?.city || d.address?.town || d.address?.village || d.address?.county || 'My Location';
+  } catch(e) { return 'My Location'; }
+}
+
 // Geolocation
 document.getElementById('locBtn').addEventListener('click', () => {
   if (!navigator.geolocation) {
@@ -822,12 +830,13 @@ document.getElementById('locBtn').addEventListener('click', () => {
   }
   showLoading();
   navigator.geolocation.getCurrentPosition(
-    pos => {
+    async pos => {
       PREFS.lastLat = pos.coords.latitude;
       PREFS.lastLon = pos.coords.longitude;
-      PREFS.lastCity = 'My Location';
+      const name = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+      PREFS.lastCity = name;
       savePrefs();
-      loadCoords(pos.coords.latitude, pos.coords.longitude, 'My Location');
+      loadCoords(pos.coords.latitude, pos.coords.longitude, name);
     },
     err => {
       // Always recover by loading the last known city
