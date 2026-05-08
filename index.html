@@ -573,7 +573,7 @@ function renderWeather(data, locationName) {
       const label = i === 0 ? 'Now' : t.getHours().toString().padStart(2,'0') + ':00';
       let [icon] = wxInfo(h.weather_code[idx]);
       const hCode = h.weather_code[idx];
-      if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1)) icon = '🌙';
+      if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) icon = '🌙';
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
