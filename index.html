@@ -82,16 +82,17 @@
   .icon-btn {
     width:38px; height:38px;
     border-radius:12px;
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
     color: var(--text);
     font-size: 1.1rem;
     cursor: pointer;
     display:flex; align-items:center; justify-content:center;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12);
   }
-  .icon-btn:hover { background: rgba(255,255,255,0.13); border-color: var(--accent); }
-  .icon-btn:active { transform: scale(0.88); }
+  .icon-btn:hover { background: rgba(255,255,255,0.18); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,0.35); }
+  .icon-btn:active { transform: scale(0.88); box-shadow: none; }
 
   /* SEARCH */
   .search-wrap {
@@ -206,30 +207,28 @@
     font-style:italic;
   }
 
-  /* UNIFIED STAT CHIPS — display-only, not interactive */
+  /* STAT CHIPS — display-only data labels, not interactive */
   .hero-chips {
-    display:flex; gap:8px; flex-wrap:wrap;
+    display:flex; gap:0; flex-wrap:wrap;
+    margin-top:2px;
   }
   .chip {
     display:flex; flex-direction:column; align-items:center;
-    padding: 5px 10px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.05);
+    padding: 2px 14px;
+    background: none;
     border: none;
-    min-width: 48px;
+    border-left: 1px solid rgba(255,255,255,0.15);
+    border-radius: 0;
     cursor: default;
   }
+  .chip:first-child { border-left: none; padding-left: 2px; }
   .chip-label {
     font-size:0.6rem; text-transform:uppercase; letter-spacing:0.09em;
-    color:var(--text-dim); margin-bottom:3px; white-space:nowrap;
+    color:var(--text-dim); margin-bottom:2px; white-space:nowrap;
   }
   .chip-value {
     font-size:0.88rem; font-weight:500; color:var(--text); white-space:nowrap;
   }
-  .chip.chip-uv-moderate { border-color:rgba(250,204,21,0.35); }
-  .chip.chip-uv-high     { border-color:rgba(251,146,60,0.38); }
-  .chip.chip-uv-very-high{ border-color:rgba(239,68,68,0.38);  }
-  .chip.chip-uv-extreme  { border-color:rgba(168,85,247,0.4);  }
   .chip.chip-uv-moderate .chip-value { color:#fde68a; }
   .chip.chip-uv-high     .chip-value { color:#fed7aa; }
   .chip.chip-uv-very-high .chip-value { color:#fca5a5; }
