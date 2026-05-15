@@ -261,6 +261,7 @@
   .hour-time { font-size:0.72rem; color:var(--text-dim); margin-bottom:6px; }
   .hour-icon { font-size:1.4rem; margin-bottom:5px; }
   .hour-temp { font-size:0.92rem; font-weight:500; }
+  .hour-rain { font-size:0.62rem; color:#60a5fa; margin-top:4px; white-space:nowrap; }
 
   /* FORECAST */
   .forecast-list { padding:0 16px; display:flex; flex-direction:column; gap:9px; }
@@ -527,6 +528,16 @@ function uvLabel(val) {
   if (val >= 3)  return 'Moderate';
   return 'Low';
 }
+function fmtRain(pct, vol) {
+  const showPct = pct >= 20;
+  const showVol = vol > 0;
+  if (!showPct && !showVol) return '';
+  let s = '💧';
+  if (showPct) s += pct + '%';
+  if (showPct && showVol) s += ' · ';
+  if (showVol) s += (vol < 10 ? vol.toFixed(1) : Math.round(vol)) + 'mm';
+  return s;
+}
 
 const PREFS = {
   theme: 'arctic',
@@ -575,7 +586,7 @@ async function geocode(city) {
 }
 
 async function fetchWeather(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index,surface_pressure&hourly=temperature_2m,weather_code,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&wind_speed_unit=kmh&timezone=auto&past_days=1&forecast_days=7`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,uv_index,surface_pressure&hourly=temperature_2m,weather_code,precipitation_probability,precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max&wind_speed_unit=kmh&timezone=auto&past_days=1&forecast_days=7`;
   const r = await fetch(url);
   return r.json();
 }
@@ -620,10 +631,12 @@ function renderWeather(data, locationName) {
       let [icon] = wxInfo(h.weather_code[idx]);
       const hCode = h.weather_code[idx];
       if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) icon = '🌙';
+      const hRain = fmtRain(h.precipitation_probability[idx] ?? 0, h.precipitation[idx] ?? 0);
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
         <div class="hour-temp">${fmtNum(h.temperature_2m[idx])}°</div>
+        ${hRain ? `<div class="hour-rain">${hRain}</div>` : ''}
       </div>`;
     }
   }
@@ -649,7 +662,9 @@ function renderWeather(data, locationName) {
     const lo = fmtNum(d.temperature_2m_min[i]);
     const pct = absMax > absMin ? ((hi - absMin)/(absMax - absMin))*100 : 50;
     const rainPct = d.precipitation_probability_max[i] ?? 0;
-    const rainBadge = rainPct >= 20 ? `<div class="forecast-rain-pct">💧${rainPct}%</div>` : '';
+    const rainVol = d.precipitation_sum?.[i] ?? 0;
+    const rainText = fmtRain(rainPct, rainVol);
+    const rainBadge = rainText ? `<div class="forecast-rain-pct">${rainText}</div>` : '';
 
     forecastHTML += `<div class="forecast-row fade-up${isYesterday ? ' forecast-yesterday' : ''}"${!isYesterday ? ` data-day-idx="${i}"` : ''}>
       <div class="forecast-day">${dayName}</div>
@@ -840,6 +855,7 @@ function showDayDetail(i) {
   const hi = fmtNum(d.temperature_2m_max[i]);
   const lo = fmtNum(d.temperature_2m_min[i]);
   const rainPct = d.precipitation_probability_max[i] ?? 0;
+  const rainVol = d.precipitation_sum?.[i] ?? 0;
   const uv = Math.round(d.uv_index_max?.[i] ?? 0);
   const srDate = d.sunrise?.[i] ? new Date(d.sunrise[i]) : null;
   const ssDate = d.sunset?.[i]  ? new Date(d.sunset[i])  : null;
@@ -856,11 +872,13 @@ function showDayDetail(i) {
     const hCode = h.weather_code[idx];
     if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) hIcon = '🌙';
     const hPct = h.precipitation_probability[idx] ?? 0;
+    const hVol = h.precipitation[idx] ?? 0;
+    const hRain = fmtRain(hPct, hVol);
     hourlyHTML += `<div class="day-hour-card">
       <div class="hour-time">${label}</div>
       <div class="hour-icon">${hIcon}</div>
       <div class="hour-temp">${fmtNum(h.temperature_2m[idx])}°</div>
-      <div class="day-hour-rain">${hPct >= 20 ? '💧' + hPct + '%' : ''}</div>
+      <div class="day-hour-rain">${hRain}</div>
     </div>`;
   });
 
@@ -878,7 +896,7 @@ function showDayDetail(i) {
       <div class="day-detail-temps">${lo}° – ${hi}°</div>
     </div>
     <div class="day-detail-chips">
-      ${rainPct >= 20 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${rainPct}%</span></div>` : ''}
+      ${rainPct >= 20 || rainVol > 0 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${[rainPct >= 20 ? rainPct + '%' : '', rainVol > 0 ? (rainVol < 10 ? rainVol.toFixed(1) : Math.round(rainVol)) + 'mm' : ''].filter(Boolean).join(' · ')}</span></div>` : ''}
       ${uv >= 3 ? `<div class="chip chip-${uvClass(uv)}"><span class="chip-label">UV</span><span class="chip-value">${uv} · ${uvLabel(uv)}</span></div>` : ''}
       ${srDate ? `<div class="chip"><span class="chip-label">Sunrise</span><span class="chip-value">${fmtTime(srDate)}</span></div>` : ''}
       ${ssDate ? `<div class="chip"><span class="chip-label">Sunset</span><span class="chip-value">${fmtTime(ssDate)}</span></div>` : ''}
