@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>MySky</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛅</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -389,20 +390,25 @@
     background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.18));
   }
 
-  /* SUNRISE / SUNSET BAR */
+  /* SUNRISE / SUNSET PROGRESS BAR */
   .sun-bar {
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; gap:12px;
     margin: 4px 16px 14px;
-    padding: 11px 18px;
+    padding: 12px 18px;
     border-radius: 16px;
     background: var(--glass);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(10px);
   }
-  .sun-item { display:flex; align-items:center; gap:7px; font-size:0.88rem; }
-  .sun-item .sun-label { color:var(--text-dim); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; margin-right:2px; }
-  .sun-item-right .sun-label { margin-right:0; margin-left:2px; }
-  .sun-divider { width:1px; height:24px; background:var(--glass-border); }
+  .sun-endpoint { display:flex; flex-direction:column; align-items:center; gap:2px; min-width:44px; }
+  .sun-endpoint-time { font-size:0.8rem; font-weight:600; }
+  .sun-endpoint-label { color:var(--text-dim); font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; }
+  .sun-track-wrap { flex:1; position:relative; height:30px; display:flex; align-items:center; }
+  .sun-track { width:100%; height:4px; border-radius:2px; background:var(--glass-border); position:relative; }
+  .sun-track-fill { position:absolute; top:0; left:0; height:100%; border-radius:2px; }
+  .sun-track-day { background:linear-gradient(90deg,#f59e0b99,#f9731699); }
+  .sun-track-night { background:linear-gradient(90deg,#6366f199,#818cf899); }
+  .sun-marker { position:absolute; top:50%; transform:translate(-50%,-50%); font-size:1rem; line-height:1; }
 
   /* fade in */
   @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -410,6 +416,26 @@
   .fade-up:nth-child(2){animation-delay:0.07s}
   .fade-up:nth-child(3){animation-delay:0.14s}
   .fade-up:nth-child(4){animation-delay:0.21s}
+
+  /* Rain pct badge under forecast icon */
+  .forecast-icon-wrap { flex:1; text-align:center; }
+  .forecast-rain-pct { font-size:0.64rem; color:#60a5fa; margin-top:3px; line-height:1; }
+  .forecast-row:not(.forecast-yesterday) { cursor:pointer; }
+  .forecast-row:not(.forecast-yesterday):hover { background:rgba(255,255,255,0.12); }
+
+  /* Day detail drawer */
+  .day-detail-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+  .day-detail-name { font-family:var(--font-display); font-size:1.6rem; line-height:1; }
+  .day-detail-date { font-size:0.8rem; color:var(--text-dim); margin-top:4px; }
+  .day-detail-main { text-align:center; margin:4px 0 14px; }
+  .day-detail-icon { font-size:3.2rem; line-height:1; margin-bottom:6px; }
+  .day-detail-condition { font-size:1rem; color:var(--text-dim); margin-bottom:6px; }
+  .day-detail-temps { font-family:var(--font-display); font-size:2rem; }
+  .day-detail-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .day-hourly-scroll { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; margin-bottom:8px; }
+  .day-hourly-scroll::-webkit-scrollbar { display:none; }
+  .day-hour-card { flex:0 0 56px; text-align:center; background:var(--glass); border:1px solid var(--glass-border); border-radius:14px; padding:8px 4px; }
+  .day-hour-rain { font-size:0.58rem; color:#60a5fa; margin-top:3px; min-height:10px; }
 </style>
 </head>
 <body>
@@ -471,7 +497,37 @@
 
 </div>
 
+<!-- Day Detail Drawer -->
+<div class="drawer-overlay" id="dayOverlay"></div>
+<div class="drawer" id="dayDrawer">
+  <div class="drawer-handle"></div>
+  <div id="dayDrawerContent"></div>
+</div>
+
 <script>
+let _wxData = null, _wxLocation = '', _dailySunMap = {};
+
+function isHourNight(hTimeStr) {
+  const entry = _dailySunMap[hTimeStr.slice(0, 10)];
+  if (!entry || !entry.sr || !entry.ss) return false;
+  const t = new Date(hTimeStr);
+  return t < entry.sr || t > entry.ss;
+}
+function uvClass(val) {
+  if (val >= 11) return 'uv-extreme';
+  if (val >= 8)  return 'uv-very-high';
+  if (val >= 6)  return 'uv-high';
+  if (val >= 3)  return 'uv-moderate';
+  return 'uv-low';
+}
+function uvLabel(val) {
+  if (val >= 11) return 'Extreme';
+  if (val >= 8)  return 'Very High';
+  if (val >= 6)  return 'High';
+  if (val >= 3)  return 'Moderate';
+  return 'Low';
+}
+
 const PREFS = {
   theme: 'arctic',
   useFahrenheit: false,
@@ -525,6 +581,8 @@ async function fetchWeather(lat, lon) {
 }
 
 function renderWeather(data, locationName) {
+  _wxData = data;
+  _wxLocation = locationName;
   const c = data.current;
   const d = data.daily;
   const h = data.hourly;
@@ -532,6 +590,24 @@ function renderWeather(data, locationName) {
   // Find current hour index
   const now = new Date();
   const currentHour = now.getHours();
+
+  // today is index 1 because past_days=1 shifts by one
+  const todayIdx = 1;
+  const sunriseDate = d.sunrise?.[todayIdx] ? new Date(d.sunrise[todayIdx]) : null;
+  const sunsetDate  = d.sunset?.[todayIdx]  ? new Date(d.sunset[todayIdx])  : null;
+  const tomorrowSunriseDate = d.sunrise?.[todayIdx + 1] ? new Date(d.sunrise[todayIdx + 1]) : null;
+  const yesterdaySunsetDate = d.sunset?.[0] ? new Date(d.sunset[0]) : null;
+
+  // Per-date sunrise/sunset map for accurate night detection across day boundaries
+  _dailySunMap = {};
+  if (d.time) {
+    d.time.forEach((dateStr, i) => {
+      _dailySunMap[dateStr] = {
+        sr: d.sunrise?.[i] ? new Date(d.sunrise[i]) : null,
+        ss: d.sunset?.[i]  ? new Date(d.sunset[i])  : null,
+      };
+    });
+  }
 
   // Build hourly (next 24h)
   let hourlyHTML = '';
@@ -541,7 +617,9 @@ function renderWeather(data, locationName) {
       if (idx >= h.time.length) break;
       const t = new Date(h.time[idx]);
       const label = i === 0 ? 'Now' : t.getHours().toString().padStart(2,'0') + ':00';
-      const [icon] = wxInfo(h.weather_code[idx]);
+      let [icon] = wxInfo(h.weather_code[idx]);
+      const hCode = h.weather_code[idx];
+      if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) icon = '🌙';
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
@@ -570,10 +648,15 @@ function renderWeather(data, locationName) {
     const hi = fmtNum(d.temperature_2m_max[i]);
     const lo = fmtNum(d.temperature_2m_min[i]);
     const pct = absMax > absMin ? ((hi - absMin)/(absMax - absMin))*100 : 50;
+    const rainPct = d.precipitation_probability_max[i] ?? 0;
+    const rainBadge = rainPct >= 20 ? `<div class="forecast-rain-pct">💧${rainPct}%</div>` : '';
 
-    forecastHTML += `<div class="forecast-row fade-up${isYesterday ? ' forecast-yesterday' : ''}">
+    forecastHTML += `<div class="forecast-row fade-up${isYesterday ? ' forecast-yesterday' : ''}"${!isYesterday ? ` data-day-idx="${i}"` : ''}>
       <div class="forecast-day">${dayName}</div>
-      <div class="forecast-icon">${icon}</div>
+      <div class="forecast-icon-wrap">
+        <div class="forecast-icon">${icon}</div>
+        ${rainBadge}
+      </div>
       <div class="forecast-bar-wrap">
         <div class="forecast-bar"><div class="forecast-bar-fill" style="width:${pct}%"></div></div>
       </div>
@@ -610,34 +693,55 @@ function renderWeather(data, locationName) {
       </div>
     </div>`;
 
-  // Sunrise / sunset inline bar — today is index 1 (past_days=1 shifts by 1)
-  const todayIdx = 1;
-  const sunrise = d.sunrise?.[todayIdx] ? new Date(d.sunrise[todayIdx]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
-  const sunset  = d.sunset?.[todayIdx]  ? new Date(d.sunset[todayIdx]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+  // Daily progress bar (sunrise↔sunset during day, sunset↔sunrise during night)
+  const sunrise = sunriseDate ? sunriseDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+  const sunset  = sunsetDate  ? sunsetDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})  : '--';
+  const tomorrowSunrise = tomorrowSunriseDate ? tomorrowSunriseDate.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '--';
+
+  let sbStartIcon = '🌅', sbStartTime = sunrise, sbStartLabel = 'Sunrise';
+  let sbEndIcon = '🌇', sbEndTime = sunset, sbEndLabel = 'Sunset';
+  let sbMarker = '☀️', sbTrackClass = 'sun-track-day', sbPct = 0;
+
+  if (sunriseDate && sunsetDate) {
+    if (now >= sunriseDate && now <= sunsetDate) {
+      sbPct = Math.min(100, (now - sunriseDate) / (sunsetDate - sunriseDate) * 100);
+      sbStartIcon = '🌅'; sbStartTime = sunrise;        sbStartLabel = 'Sunrise';
+      sbEndIcon   = '🌇'; sbEndTime   = sunset;          sbEndLabel   = 'Sunset';
+      sbMarker = '☀️'; sbTrackClass = 'sun-track-day';
+    } else if (now > sunsetDate) {
+      const nextSr = tomorrowSunriseDate ?? new Date(sunriseDate.getTime() + 86400000);
+      sbPct = Math.min(100, (now - sunsetDate) / (nextSr - sunsetDate) * 100);
+      sbStartIcon = '🌇'; sbStartTime = sunset;          sbStartLabel = 'Sunset';
+      sbEndIcon   = '🌅'; sbEndTime   = tomorrowSunrise; sbEndLabel   = 'Sunrise';
+      sbMarker = '🌙'; sbTrackClass = 'sun-track-night';
+    } else {
+      const prevSs = yesterdaySunsetDate ?? new Date(sunsetDate.getTime() - 86400000);
+      sbPct = Math.min(100, (now - prevSs) / (sunriseDate - prevSs) * 100);
+      sbStartIcon = '🌇'; sbStartTime = prevSs.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); sbStartLabel = 'Sunset';
+      sbEndIcon   = '🌅'; sbEndTime   = sunrise;          sbEndLabel   = 'Sunrise';
+      sbMarker = '🌙'; sbTrackClass = 'sun-track-night';
+    }
+  }
+
   const sunBarHTML = `
     <div class="sun-bar fade-up">
-      <div class="sun-item"><span class="sun-label">Sunrise</span><strong>${sunrise}</strong></div>
-      <div class="sun-divider"></div>
-      <div class="sun-item sun-item-right"><strong>${sunset}</strong><span class="sun-label">Sunset</span></div>
+      <div class="sun-endpoint">
+        <div class="sun-endpoint-time">${sbStartTime}</div>
+        <div class="sun-endpoint-label">${sbStartLabel}</div>
+      </div>
+      <div class="sun-track-wrap">
+        <div class="sun-track">
+          <div class="sun-track-fill ${sbTrackClass}" style="width:${sbPct.toFixed(1)}%"></div>
+        </div>
+        <div class="sun-marker" style="left:${sbPct.toFixed(1)}%">${sbMarker}</div>
+      </div>
+      <div class="sun-endpoint">
+        <div class="sun-endpoint-time">${sbEndTime}</div>
+        <div class="sun-endpoint-label">${sbEndLabel}</div>
+      </div>
     </div>`;
 
   const [wxIcon, wxLabel] = wxInfo(c.weather_code);
-
-  // UV helpers
-  function uvClass(val) {
-    if (val >= 11) return 'uv-extreme';
-    if (val >= 8)  return 'uv-very-high';
-    if (val >= 6)  return 'uv-high';
-    if (val >= 3)  return 'uv-moderate';
-    return 'uv-low';
-  }
-  function uvLabel(val) {
-    if (val >= 11) return 'Extreme';
-    if (val >= 8)  return 'Very High';
-    if (val >= 6)  return 'High';
-    if (val >= 3)  return 'Moderate';
-    return 'Low';
-  }
 
   const currentUV = Math.round(c.uv_index ?? 0);
   const curUVClass  = uvClass(currentUV);
@@ -710,6 +814,81 @@ function renderWeather(data, locationName) {
     document.getElementById('unitToggle').classList.toggle('on', PREFS.useFahrenheit);
     renderWeather(data, locationName);
   });
+
+  document.querySelectorAll('.forecast-row[data-day-idx]').forEach(row => {
+    row.addEventListener('click', () => showDayDetail(+row.dataset.dayIdx));
+  });
+}
+
+function closeDayDrawer() {
+  document.getElementById('dayOverlay').classList.remove('open');
+  document.getElementById('dayDrawer').classList.remove('open');
+}
+
+function showDayDetail(i) {
+  const d = _wxData.daily;
+  const h = _wxData.hourly;
+  const now = new Date();
+  const today = now.getDay();
+  let dayName;
+  if      (i === 1) dayName = 'Today';
+  else if (i === 2) dayName = 'Tomorrow';
+  else              dayName = DAYS[(today + i - 1) % 7];
+
+  const dateStr = d.time[i];
+  const [icon, condition] = wxInfo(d.weather_code[i]);
+  const hi = fmtNum(d.temperature_2m_max[i]);
+  const lo = fmtNum(d.temperature_2m_min[i]);
+  const rainPct = d.precipitation_probability_max[i] ?? 0;
+  const uv = Math.round(d.uv_index_max?.[i] ?? 0);
+  const srDate = d.sunrise?.[i] ? new Date(d.sunrise[i]) : null;
+  const ssDate = d.sunset?.[i]  ? new Date(d.sunset[i])  : null;
+  const fmtTime = t => t ? t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+  const dateFormatted = new Date(dateStr + 'T12:00:00').toLocaleDateString([], {month:'long', day:'numeric'});
+
+  const hourIndices = [];
+  h.time.forEach((t, idx) => { if (t.startsWith(dateStr)) hourIndices.push(idx); });
+
+  let hourlyHTML = '';
+  hourIndices.forEach(idx => {
+    const label = new Date(h.time[idx]).getHours().toString().padStart(2,'0') + ':00';
+    let [hIcon] = wxInfo(h.weather_code[idx]);
+    const hCode = h.weather_code[idx];
+    if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) hIcon = '🌙';
+    const hPct = h.precipitation_probability[idx] ?? 0;
+    hourlyHTML += `<div class="day-hour-card">
+      <div class="hour-time">${label}</div>
+      <div class="hour-icon">${hIcon}</div>
+      <div class="hour-temp">${fmtNum(h.temperature_2m[idx])}°</div>
+      <div class="day-hour-rain">${hPct >= 20 ? '💧' + hPct + '%' : ''}</div>
+    </div>`;
+  });
+
+  document.getElementById('dayDrawerContent').innerHTML = `
+    <div class="day-detail-header">
+      <div>
+        <div class="day-detail-name">${dayName}</div>
+        <div class="day-detail-date">${dateFormatted}</div>
+      </div>
+      <button class="icon-btn" id="dayDrawerClose">✕</button>
+    </div>
+    <div class="day-detail-main">
+      <div class="day-detail-icon">${icon}</div>
+      <div class="day-detail-condition">${condition}</div>
+      <div class="day-detail-temps">${lo}° – ${hi}°</div>
+    </div>
+    <div class="day-detail-chips">
+      ${rainPct >= 20 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${rainPct}%</span></div>` : ''}
+      ${uv >= 3 ? `<div class="chip chip-${uvClass(uv)}"><span class="chip-label">UV</span><span class="chip-value">${uv} · ${uvLabel(uv)}</span></div>` : ''}
+      ${srDate ? `<div class="chip"><span class="chip-label">Sunrise</span><span class="chip-value">${fmtTime(srDate)}</span></div>` : ''}
+      ${ssDate ? `<div class="chip"><span class="chip-label">Sunset</span><span class="chip-value">${fmtTime(ssDate)}</span></div>` : ''}
+    </div>
+    ${hourlyHTML ? `<div class="section-label" style="padding:0 4px 8px">Hourly</div><div class="day-hourly-scroll">${hourlyHTML}</div>` : ''}
+  `;
+
+  document.getElementById('dayDrawerClose').addEventListener('click', closeDayDrawer);
+  document.getElementById('dayOverlay').classList.add('open');
+  document.getElementById('dayDrawer').classList.add('open');
 }
 
 function showLoading() {
@@ -761,6 +940,7 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
 overlay.addEventListener('click', () => {
   drawer.classList.remove('open'); overlay.classList.remove('open');
 });
+document.getElementById('dayOverlay').addEventListener('click', closeDayDrawer);
 
 document.querySelectorAll('.swatch').forEach(s => {
   s.addEventListener('click', () => applyTheme(s.dataset.t));
