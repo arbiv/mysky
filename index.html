@@ -532,11 +532,12 @@ function uvLabel(val) {
   if (val >= 3)  return 'Moderate';
   return 'Low';
 }
+const MIN_RAIN_VOL = 0.2;
 function fmtRainPct(pct, vol) {
-  return (pct >= 20 || vol > 0) ? '💧' + pct + '%' : '';
+  return (pct >= 20 || vol >= MIN_RAIN_VOL) ? '💧' + pct + '%' : '';
 }
 function rainVolBar(vol) {
-  if (!(vol > 0)) return '';
+  if (vol < MIN_RAIN_VOL) return '';
   const pct = Math.min(vol / 8, 1) * 100;
   return `<div class="rain-vol-bar"><div class="rain-vol-fill" style="width:${pct}%"></div></div>`;
 }
@@ -904,7 +905,7 @@ function showDayDetail(i) {
     </div>
     <div class="day-detail-chips">
       ${rainPct >= 20 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${rainPct}%</span></div>` : ''}
-      ${rainVol > 0 ? `<div class="chip"><span class="chip-label">Volume</span><span class="chip-value">${rainVol < 10 ? rainVol.toFixed(1) : Math.round(rainVol)}mm</span></div>` : ''}
+      ${rainVol >= MIN_RAIN_VOL ? `<div class="chip"><span class="chip-label">Volume</span><span class="chip-value">${rainVol < 10 ? rainVol.toFixed(1) : Math.round(rainVol)}mm</span></div>` : ''}
       ${uv >= 3 ? `<div class="chip chip-${uvClass(uv)}"><span class="chip-label">UV</span><span class="chip-value">${uv} · ${uvLabel(uv)}</span></div>` : ''}
       ${srDate ? `<div class="chip"><span class="chip-label">Sunrise</span><span class="chip-value">${fmtTime(srDate)}</span></div>` : ''}
       ${ssDate ? `<div class="chip"><span class="chip-label">Sunset</span><span class="chip-value">${fmtTime(ssDate)}</span></div>` : ''}
