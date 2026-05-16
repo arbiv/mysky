@@ -532,8 +532,8 @@ function uvLabel(val) {
   if (val >= 3)  return 'Moderate';
   return 'Low';
 }
-function fmtRainPct(pct) {
-  return pct >= 20 ? '💧' + pct + '%' : '';
+function fmtRainPct(pct, vol) {
+  return (pct >= 20 || vol > 0) ? '💧' + pct + '%' : '';
 }
 function rainVolBar(vol) {
   if (!(vol > 0)) return '';
@@ -635,7 +635,7 @@ function renderWeather(data, locationName) {
       if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) icon = '🌙';
       const hPct = h.precipitation_probability[idx] ?? 0;
       const hVol = h.precipitation[idx] ?? 0;
-      const hPctTxt = fmtRainPct(hPct);
+      const hPctTxt = fmtRainPct(hPct, hVol);
       const hVolBar = rainVolBar(hVol);
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
@@ -668,7 +668,7 @@ function renderWeather(data, locationName) {
     const pct = absMax > absMin ? ((hi - absMin)/(absMax - absMin))*100 : 50;
     const rainPct = d.precipitation_probability_max[i] ?? 0;
     const rainVol = d.precipitation_sum?.[i] ?? 0;
-    const rainPctTxt = fmtRainPct(rainPct);
+    const rainPctTxt = fmtRainPct(rainPct, rainVol);
     const rainBar = rainVolBar(rainVol);
     const rainBadge = rainPctTxt || rainBar ? `${rainPctTxt ? `<div class="forecast-rain-pct">${rainPctTxt}</div>` : ''}${rainBar}` : '';
 
@@ -879,7 +879,7 @@ function showDayDetail(i) {
     if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) hIcon = '🌙';
     const hPct = h.precipitation_probability[idx] ?? 0;
     const hVol = h.precipitation[idx] ?? 0;
-    const hPctTxt = fmtRainPct(hPct);
+    const hPctTxt = fmtRainPct(hPct, hVol);
     const hVolBar = rainVolBar(hVol);
     hourlyHTML += `<div class="day-hour-card">
       <div class="hour-time">${label}</div>
