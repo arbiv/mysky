@@ -418,9 +418,13 @@
   .fade-up:nth-child(3){animation-delay:0.14s}
   .fade-up:nth-child(4){animation-delay:0.21s}
 
-  /* Rain pct badge under forecast icon */
+  /* Rain indicators */
   .forecast-icon-wrap { flex:1; text-align:center; }
   .forecast-rain-pct { font-size:0.64rem; color:#60a5fa; margin-top:3px; line-height:1; }
+  .rain-vol-bar { height:3px; border-radius:2px; background:rgba(96,165,250,0.18); margin-top:4px; overflow:hidden; }
+  .rain-vol-fill { height:100%; border-radius:2px; background:#60a5fa; }
+  .forecast-icon-wrap .rain-vol-bar { width:80%; margin:4px auto 0; }
+  .hour-rain .rain-vol-bar { width:100%; margin-top:3px; }
   .forecast-row:not(.forecast-yesterday) { cursor:pointer; }
   .forecast-row:not(.forecast-yesterday):hover { background:rgba(255,255,255,0.12); }
 
@@ -528,15 +532,13 @@ function uvLabel(val) {
   if (val >= 3)  return 'Moderate';
   return 'Low';
 }
-function fmtRain(pct, vol) {
-  const showPct = pct >= 20;
-  const showVol = vol > 0;
-  if (!showPct && !showVol) return '';
-  let s = '💧';
-  if (showPct) s += pct + '%';
-  if (showPct && showVol) s += ' · ';
-  if (showVol) s += (vol < 10 ? vol.toFixed(1) : Math.round(vol)) + 'mm';
-  return s;
+function fmtRainPct(pct) {
+  return pct >= 20 ? '💧' + pct + '%' : '';
+}
+function rainVolBar(vol) {
+  if (!(vol > 0)) return '';
+  const pct = Math.min(vol / 8, 1) * 100;
+  return `<div class="rain-vol-bar"><div class="rain-vol-fill" style="width:${pct}%"></div></div>`;
 }
 
 const PREFS = {
@@ -631,12 +633,15 @@ function renderWeather(data, locationName) {
       let [icon] = wxInfo(h.weather_code[idx]);
       const hCode = h.weather_code[idx];
       if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) icon = '🌙';
-      const hRain = fmtRain(h.precipitation_probability[idx] ?? 0, h.precipitation[idx] ?? 0);
+      const hPct = h.precipitation_probability[idx] ?? 0;
+      const hVol = h.precipitation[idx] ?? 0;
+      const hPctTxt = fmtRainPct(hPct);
+      const hVolBar = rainVolBar(hVol);
       hourlyHTML += `<div class="hour-card ${i===0?'active':''}">
         <div class="hour-time">${label}</div>
         <div class="hour-icon">${icon}</div>
         <div class="hour-temp">${fmtNum(h.temperature_2m[idx])}°</div>
-        ${hRain ? `<div class="hour-rain">${hRain}</div>` : ''}
+        ${hPctTxt || hVolBar ? `<div class="hour-rain">${hPctTxt}${hVolBar}</div>` : ''}
       </div>`;
     }
   }
@@ -663,8 +668,9 @@ function renderWeather(data, locationName) {
     const pct = absMax > absMin ? ((hi - absMin)/(absMax - absMin))*100 : 50;
     const rainPct = d.precipitation_probability_max[i] ?? 0;
     const rainVol = d.precipitation_sum?.[i] ?? 0;
-    const rainText = fmtRain(rainPct, rainVol);
-    const rainBadge = rainText ? `<div class="forecast-rain-pct">${rainText}</div>` : '';
+    const rainPctTxt = fmtRainPct(rainPct);
+    const rainBar = rainVolBar(rainVol);
+    const rainBadge = rainPctTxt || rainBar ? `${rainPctTxt ? `<div class="forecast-rain-pct">${rainPctTxt}</div>` : ''}${rainBar}` : '';
 
     forecastHTML += `<div class="forecast-row fade-up${isYesterday ? ' forecast-yesterday' : ''}"${!isYesterday ? ` data-day-idx="${i}"` : ''}>
       <div class="forecast-day">${dayName}</div>
@@ -873,12 +879,13 @@ function showDayDetail(i) {
     if (isHourNight(h.time[idx]) && (hCode === 0 || hCode === 1 || hCode === 2)) hIcon = '🌙';
     const hPct = h.precipitation_probability[idx] ?? 0;
     const hVol = h.precipitation[idx] ?? 0;
-    const hRain = fmtRain(hPct, hVol);
+    const hPctTxt = fmtRainPct(hPct);
+    const hVolBar = rainVolBar(hVol);
     hourlyHTML += `<div class="day-hour-card">
       <div class="hour-time">${label}</div>
       <div class="hour-icon">${hIcon}</div>
       <div class="hour-temp">${fmtNum(h.temperature_2m[idx])}°</div>
-      <div class="day-hour-rain">${hRain}</div>
+      <div class="day-hour-rain">${hPctTxt}${hVolBar}</div>
     </div>`;
   });
 
@@ -896,7 +903,8 @@ function showDayDetail(i) {
       <div class="day-detail-temps">${lo}° – ${hi}°</div>
     </div>
     <div class="day-detail-chips">
-      ${rainPct >= 20 || rainVol > 0 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${[rainPct >= 20 ? rainPct + '%' : '', rainVol > 0 ? (rainVol < 10 ? rainVol.toFixed(1) : Math.round(rainVol)) + 'mm' : ''].filter(Boolean).join(' · ')}</span></div>` : ''}
+      ${rainPct >= 20 ? `<div class="chip"><span class="chip-label">Rain</span><span class="chip-value">${rainPct}%</span></div>` : ''}
+      ${rainVol > 0 ? `<div class="chip"><span class="chip-label">Volume</span><span class="chip-value">${rainVol < 10 ? rainVol.toFixed(1) : Math.round(rainVol)}mm</span></div>` : ''}
       ${uv >= 3 ? `<div class="chip chip-${uvClass(uv)}"><span class="chip-label">UV</span><span class="chip-value">${uv} · ${uvLabel(uv)}</span></div>` : ''}
       ${srDate ? `<div class="chip"><span class="chip-label">Sunrise</span><span class="chip-value">${fmtTime(srDate)}</span></div>` : ''}
       ${ssDate ? `<div class="chip"><span class="chip-label">Sunset</span><span class="chip-value">${fmtTime(ssDate)}</span></div>` : ''}
